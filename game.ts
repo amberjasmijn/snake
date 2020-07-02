@@ -1,9 +1,11 @@
-import { Snake } from './types'
+import { Snake, Move, Position } from './types'
 
-const SPEED = 100
-
-type Move = { x: number; y: number }
-type Position = { x: number; y: number }
+const SPEED = 500
+const WIDTH = 30
+const HEIGHT = 20
+const BACKGROUND = '#4274ff'
+const SNAKE_COLOR = '#75D4BE'
+const APPLE_COLOR = '#e01dee'
 
 const UP: Move = { x: 0, y: -1 }
 const DOWN: Move = { x: 0, y: 1 }
@@ -13,7 +15,7 @@ const LEFT: Move = { x: -1, y: 0 }
 const canvas = document.getElementById('canvas') as HTMLCanvasElement
 const context = canvas.getContext('2d')
 
-interface State {
+interface GameState {
   cols: number
   rows: number
   snake: Snake[]
@@ -21,9 +23,9 @@ interface State {
   apple: Position
 }
 
-const initialState = (): State => ({
-  cols: 30,
-  rows: 20,
+const initialState = (): GameState => ({
+  cols: WIDTH,
+  rows: HEIGHT,
   snake: [{ x: 6, y: 6 }],
   moves: [RIGHT],
   apple: { x: 10, y: 6 }
@@ -33,10 +35,11 @@ let state = initialState()
 
 const removeFirst = (x: Move[]): Move[] => x.slice(1)
 const removeLast = (x: Move[]): Move[] => x.slice(0, x.length - 1)
+
 const random = (min: number) => (max: number) =>
   Math.ceil(Math.random() * (max - min) + min)
 
-const randomPos = (state: State) => ({
+const randomPosition = (state: GameState) => ({
   x: random(0)(state.cols - 1),
   y: random(0)(state.rows - 1)
 })
@@ -55,26 +58,26 @@ const y = (y1: number): number => Math.round(y1 * (canvas.height / state.rows))
 const draw = (): void => {
   if (context) {
     // Canvas
-    context.fillStyle = '#004777'
+    context.fillStyle = BACKGROUND
     context.fillRect(0, 0, canvas.width, canvas.height)
 
     // Snake
-    context.fillStyle = '#00AFB5'
+    context.fillStyle = SNAKE_COLOR
     state.snake.map(cell => context.fillRect(x(cell.x), y(cell.y), x(1), y(1)))
 
     // Apple
-    context.fillStyle = '#FF7700'
+    context.fillStyle = APPLE_COLOR
     context.fillRect(x(state.apple.x), x(state.apple.y), x(1), y(1))
   }
 }
 
-const isValidMove = (state: State) => (move: Move): boolean =>
+const isValidMove = (state: GameState) => (move: Move): boolean =>
   move.x + state.moves[0].x !== 0 || move.y + state.moves[0].y !== 0
 
 const positionExist = (p1: Position) => (p2: Position): boolean =>
   p1.x === p2.x && p1.y === p2.y
 
-const nextHead = (state: State): Snake => ({
+const nextHead = (state: GameState): Snake => ({
   x: withinGrid(state.snake[0].x + state.moves[state.moves.length - 1].x)(
     state.cols
   ),
@@ -83,15 +86,15 @@ const nextHead = (state: State): Snake => ({
   )
 })
 
-const nextApple = (state: State) =>
-  willEat(state) ? randomPos(state) : state.apple
+const nextApple = (state: GameState) =>
+  willEat(state) ? randomPosition(state) : state.apple
 
-const willCrash = (state: State) =>
+const willCrash = (state: GameState) =>
   state.snake.find(positionExist(nextHead(state)))
 
-const willEat = (state: State) => positionExist(nextHead(state))(state.apple)
+const willEat = (state: GameState) => positionExist(nextHead(state))(state.apple)
 
-const nextSnake = (state: State): Snake[] => {
+const nextSnake = (state: GameState): Snake[] => {
   return willCrash(state)
     ? []
     : willEat(state)
@@ -99,27 +102,27 @@ const nextSnake = (state: State): Snake[] => {
     : [nextHead(state)].concat(removeLast(state.snake))
 }
 
-const nextMoves = (state: State): Move[] =>
+const nextMoves = (state: GameState): Move[] =>
   state.moves.length > 1 ? removeFirst(state.moves) : state.moves
 
-const next = (state: State): State => ({
+const next = (state: GameState): GameState => ({
   ...state,
   moves: nextMoves(state),
   snake: nextSnake(state),
   apple: nextApple(state)
 })
 
-const step = (t1: number) => (t2: number): void => {
+const nextStep = (t1: number) => (t2: number): void => {
   if (t2 - t1 > SPEED) {
     state = next(state)
     draw()
-    window.requestAnimationFrame(step(t2))
+    window.requestAnimationFrame(nextStep(t2))
   } else {
-    window.requestAnimationFrame(step(t1))
+    window.requestAnimationFrame(nextStep(t1))
   }
 }
 
-const enqueue = (state: State, move: Move): State =>
+const enqueueMove = (state: GameState, move: Move): GameState =>
   isValidMove(state)(move)
     ? { ...state, moves: state.moves.concat([move]) }
     : state
@@ -127,19 +130,18 @@ const enqueue = (state: State, move: Move): State =>
 window.addEventListener('keydown', event => {
   switch (event.key) {
     case 'ArrowUp':
-      state = enqueue(state, UP)
+      state = enqueueMove(state, UP)
       break
     case 'ArrowDown':
-      state = enqueue(state, DOWN)
+      state = enqueueMove(state, DOWN)
       break
     case 'ArrowRight':
-      state = enqueue(state, RIGHT)
+      state = enqueueMove(state, RIGHT)
       break
     case 'ArrowLeft':
-      state = enqueue(state, LEFT)
+      state = enqueueMove(state, LEFT)
       break
   }
 })
 
-draw()
-window.requestAnimationFrame(step(0))
+window.requestAnimationFrame(nextStep(0))
